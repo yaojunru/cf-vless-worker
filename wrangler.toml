@@ -1,0 +1,11 @@
+name = "cf-vless-worker"
+main = "src/worker.js"
+compatibility_date = "2026-07-23"
+
+# Required runtime variables:
+# - UUID: VLESS UUID
+# - WS_PATH: hidden WebSocket path, for example /assets/your-random-path
+#
+# Set them as secrets:
+#   npx wrangler secret put UUID
+#   npx wrangler secret put WS_PATH

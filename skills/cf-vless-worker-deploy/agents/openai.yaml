@@ -1,0 +1,4 @@
+interface:
+  display_name: "CF VLESS Worker Deploy"
+  short_description: "Deploy and diagnose CF VLESS Worker safely."
+  default_prompt: "Use $cf-vless-worker-deploy to deploy and validate this CF VLESS Worker."

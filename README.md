@@ -77,6 +77,22 @@ npx wrangler secret put WS_PATH
 npm run deploy
 ```
 
+## Codex 部署 Skill
+
+仓库内包含可复用的部署 Skill：[`skills/cf-vless-worker-deploy`](./skills/cf-vless-worker-deploy/)。它已覆盖预检、Secret 配置、部署验证、回滚和受保护网站的诊断边界。
+
+在 Codex 全局安装目录中创建链接后，可直接调用 `$cf-vless-worker-deploy`：
+
+```bash
+ln -s "$(pwd)/skills/cf-vless-worker-deploy" "${CODEX_HOME:-$HOME/.codex}/skills/cf-vless-worker-deploy"
+```
+
+先执行不需要 Cloudflare 凭据的预检：
+
+```bash
+skills/cf-vless-worker-deploy/scripts/preflight.sh .
+```
+
 ## 客户端配置
 
 假设：
@@ -153,6 +169,16 @@ curl -i --http1.1 \
   -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
   https://proxy.example.com/assets/a1b2c3d4e5f60708
 ```
+
+## `openai.com` 与 `x.com` 的访问说明
+
+本项目是 VLESS TCP 隧道，不是 HTTP 反向代理。正确的访问链路是浏览器或应用通过 VLESS 客户端建立到目标站点的 TLS 连接；不要把 Worker URL 当作 `https://openai.com` 或 `https://x.com` 的镜像地址。
+
+- `x.com` 首页可响应不代表登录、媒体、API 或 WebSocket 子资源一定可用，应在正常浏览器中通过已配置的客户端实测。
+- `openai.com` 可能向某些出口返回 Cloudflare Managed Challenge（例如要求 JavaScript 和 Cookie）。这是上游的访问控制，不是 VLESS 帧或 Worker 路由错误，不能且不应通过伪造 Cookie、浏览器指纹或挑战参数来绕过。
+- 先用普通 HTTPS 站点确认隧道可用，再使用支持 JavaScript 与 Cookie 的正常浏览器测试目标服务，并遵守目标服务和 Cloudflare 的条款。
+
+详细的排障与回滚步骤见 [`skills/cf-vless-worker-deploy/references/upstream-access.md`](./skills/cf-vless-worker-deploy/references/upstream-access.md)。
 
 ## License
 

@@ -116,6 +116,14 @@ node skills/cf-vless-worker-deploy/scripts/temporary-smoke-deploy.mjs .
 node skills/cf-vless-worker-deploy/scripts/local-smoke.mjs .
 ```
 
+生产部署可使用内置流程。它会先执行 `git pull --ff-only`，检查 Wrangler 登录；未登录时打开 Cloudflare 授权页并等待账户持有人确认。随后它会创建新的 Worker Secrets、部署、验证根路径为 `404`、通过 VLESS 对 `www.google.com` 完成 TLS 与 HTTP 验证，并生成私有客户端配置和二维码：
+
+```bash
+node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
+```
+
+生成的 `config.json`、VLESS 导入链接和 QR SVG 位于 `.vless-client/`。该目录被 Git 忽略；不要提交、分享或截图其中的内容。Wrangler 在部分桌面环境中可能会在输出上传进度后不退出，流程会有界等待并通过部署列表和实际连通性继续验证。
+
 ## 客户端配置
 
 假设：
@@ -198,10 +206,11 @@ curl -i --http1.1 \
 本项目是 VLESS TCP 隧道，不是 HTTP 反向代理。正确的访问链路是浏览器或应用通过 VLESS 客户端建立到目标站点的 TLS 连接；不要把 Worker URL 当作 `https://openai.com` 或 `https://x.com` 的镜像地址。
 
 - `x.com` 首页可响应不代表登录、媒体、API 或 WebSocket 子资源一定可用，应在正常浏览器中通过已配置的客户端实测。
+- 已验证的生产节点可以通过 VLESS 与 `www.google.com` 完成 TLS 并取得 `HTTP 204`，但同一条隧道连接 `x.com:443` 会在 TLS 握手前关闭。该结果表明节点的通用 TCP 出站正常，而 X 对 Cloudflare Worker 出口施加了上游策略；不能通过修改 Worker、增加 HTTP 镜像、伪造浏览器指纹或重放 Cookie 来绕过。
 - `openai.com` 可能向某些出口返回 Cloudflare Managed Challenge（例如要求 JavaScript 和 Cookie）。这是上游的访问控制，不是 VLESS 帧或 Worker 路由错误，不能且不应通过伪造 Cookie、浏览器指纹或挑战参数来绕过。
 - 先用普通 HTTPS 站点确认隧道可用，再使用支持 JavaScript 与 Cookie 的正常浏览器测试目标服务，并遵守目标服务和 Cloudflare 的条款。
 
-详细的排障与回滚步骤见 [`skills/cf-vless-worker-deploy/references/upstream-access.md`](./skills/cf-vless-worker-deploy/references/upstream-access.md)。
+详细的部署、排障与回滚步骤见 [`skills/cf-vless-worker-deploy`](./skills/cf-vless-worker-deploy/)。
 
 ## License
 

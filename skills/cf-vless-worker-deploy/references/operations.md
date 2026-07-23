@@ -2,17 +2,22 @@
 
 ## Prerequisites
 
-Use Node.js 20 or newer, an authenticated Wrangler session, and a Cloudflare account with Workers enabled. Start in the repository root.
+Use Node.js 20 or newer, an authenticated Wrangler session, and a Cloudflare account with Workers enabled. Start in the repository root. This is a hard gate: do not set secrets or deploy until `whoami` succeeds.
 
 ```bash
 npm install
 npm run check
 npm test
-npx wrangler login
-npx wrangler whoami
+node node_modules/wrangler/bin/wrangler.js whoami
 ```
 
-Confirm that `whoami` displays the intended account before secrets or deploys. Use the dashboard or `npx wrangler deployments list` to inspect existing deployments.
+If `whoami` reports that you are not authenticated, log in with:
+
+```bash
+node node_modules/wrangler/bin/wrangler.js login --use-keyring
+```
+
+Complete the browser authorization, then repeat `whoami`. When the browser cannot be opened automatically, add `--browser=false` and open the printed link manually. Confirm that `whoami` displays the intended account before secrets or deploys. Use the dashboard or `npx wrangler deployments list` to inspect existing deployments.
 
 ## Credential-free temporary smoke test
 

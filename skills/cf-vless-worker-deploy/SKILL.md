@@ -13,7 +13,13 @@ Deploy this Worker as a VLESS-over-WebSocket TCP relay. Do not treat it as an HT
 2. Run `scripts/preflight.sh <repo-dir>`. Resolve all failures before deployment.
 3. Run `node scripts/local-smoke.mjs <repo-dir>` to verify the Worker runtime, WebSocket handling, VLESS framing, and an outbound TCP relay to `example.com:80` with random in-memory test variables.
 4. For a credential-free edge preview, run `node scripts/temporary-smoke-deploy.mjs <repo-dir>`. It creates an expiring temporary Worker with random in-memory test variables and runs the same remote smoke checks.
-5. Authenticate with `npx wrangler login`, then confirm the intended account with `npx wrangler whoami` before a persistent deployment.
+5. Pass the authentication gate before any persistent deployment. Run:
+
+   ```bash
+   node node_modules/wrangler/bin/wrangler.js whoami
+   ```
+
+   If it reports that Wrangler is not authenticated, run `node node_modules/wrangler/bin/wrangler.js login --use-keyring`, complete the Cloudflare browser authorization, then run `whoami` again. Use `--browser=false` when the browser does not open. Stop here if `whoami` does not show the intended account; do not set secrets or deploy.
 6. Generate a UUID locally and choose a unique path at least eight characters long. Never write either secret to tracked files, shell history, CI logs, or client screenshots.
 7. Set secrets interactively:
 
@@ -28,6 +34,7 @@ Deploy this Worker as a VLESS-over-WebSocket TCP relay. Do not treat it as an HT
 
 ## Guardrails
 
+- Treat successful `whoami` output as a hard prerequisite for `wrangler secret put`, `npm run deploy`, custom-domain changes, rollback, and deployment inspection. A `--temporary` deployment is not a substitute for the user's Cloudflare account.
 - Keep `UUID` and `WS_PATH` as Worker secrets, not `[vars]` in `wrangler.toml`.
 - Validate the local implementation with `npm run check` and `npm test` before every production deployment.
 - Treat a `403` from an upstream as the upstream's response, not proof that VLESS framing failed. Check a neutral HTTPS site first, then test the target from an ordinary browser through the configured VLESS client.

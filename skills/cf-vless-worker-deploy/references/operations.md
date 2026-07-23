@@ -19,6 +19,31 @@ node node_modules/wrangler/bin/wrangler.js login --use-keyring
 
 Complete the browser authorization, then repeat `whoami --json`. When the browser cannot be opened automatically, add `--browser=false` and open the printed link manually. Do not use plain `whoami` for automation because Wrangler 4.113.0 can stay open after printing the result. Confirm that the JSON has `loggedIn: true` and displays the intended account before secrets or deploys. Use the dashboard or `npx wrangler deployments list` to inspect existing deployments.
 
+Pull the tracked repository before deploying. Require a clean worktree and fast-forward only; a fetch or pull confirms read access only.
+
+```bash
+git status --short
+git pull --ff-only
+```
+
+## Production workflow
+
+Run the bundled workflow with a domain that is already present as a `custom_domain` route in `wrangler.toml`:
+
+```bash
+node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
+```
+
+It performs the following in order: verifies the checkout, checks Wrangler JSON authentication, opens a browser authorization page if authentication is missing, runs code tests, creates a new UUID and WebSocket path only in process memory, stores them as Worker Secrets, deploys, requires the hidden root to return `404`, establishes a VLESS tunnel to `www.google.com:443`, completes TLS, requires an HTTP response, and writes a private client bundle.
+
+The bundle is written to `.vless-client/`, which must remain ignored by Git:
+
+- `config.json`: Xray-compatible client configuration.
+- `vless-uri.txt`: import URI for compatible clients.
+- `vless-qr.svg`: offline QR code for the URI.
+
+The script never prints generated credentials. Treat every file in this directory and screenshots of its QR code as a credential.
+
 ## Credential-free temporary smoke test
 
 Run the local test first. It starts the Worker through Workerd, sends a valid VLESS request, and requires an HTTP response from its TCP socket. It does not use a Cloudflare account or publish anything:

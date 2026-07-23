@@ -93,6 +93,18 @@ ln -s "$(pwd)/skills/cf-vless-worker-deploy" "${CODEX_HOME:-$HOME/.codex}/skills
 skills/cf-vless-worker-deploy/scripts/preflight.sh .
 ```
 
+无需 Cloudflare 账户凭据也可运行一次性端到端预览。该命令随机生成仅在进程内使用的 UUID/路径，部署临时 Worker，并通过 VLESS TCP 请求验证到 `example.com:80` 的转发：
+
+```bash
+node skills/cf-vless-worker-deploy/scripts/temporary-smoke-deploy.mjs .
+```
+
+部署前可先运行本地 Workerd 验收，它会实际验证 WebSocket、VLESS 帧和 TCP 出站：
+
+```bash
+node skills/cf-vless-worker-deploy/scripts/local-smoke.mjs .
+```
+
 ## 客户端配置
 
 假设：

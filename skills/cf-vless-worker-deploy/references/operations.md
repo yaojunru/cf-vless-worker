@@ -14,6 +14,22 @@ npx wrangler whoami
 
 Confirm that `whoami` displays the intended account before secrets or deploys. Use the dashboard or `npx wrangler deployments list` to inspect existing deployments.
 
+## Credential-free temporary smoke test
+
+Run the local test first. It starts the Worker through Workerd, sends a valid VLESS request, and requires an HTTP response from its TCP socket. It does not use a Cloudflare account or publish anything:
+
+```bash
+node skills/cf-vless-worker-deploy/scripts/local-smoke.mjs .
+```
+
+Use this only to validate the Worker implementation before a real account deployment. It creates an expiring Cloudflare temporary preview, keeps its UUID and path in process memory, checks the hidden root behavior, and sends a valid VLESS request that relays an HTTP request to `example.com:80`.
+
+```bash
+node skills/cf-vless-worker-deploy/scripts/temporary-smoke-deploy.mjs .
+```
+
+The preview URL is not a production endpoint. It does not set persistent Worker Secrets, bind a domain, or test protected sites such as `openai.com`. If the preview URL returns a Cloudflare managed challenge or times out, treat that as a network or edge-access block before the Worker, not as a successful runtime test.
+
 ## Secrets and deploy
 
 Generate the UUID locally:

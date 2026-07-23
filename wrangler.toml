@@ -1,6 +1,11 @@
 name = "cf-vless-worker"
 main = "src/worker.js"
 compatibility_date = "2026-07-23"
+workers_dev = false
+
+routes = [
+  { pattern = "vless.airen2.pp.ua", custom_domain = true }
+]
 
 # Required runtime variables:
 # - UUID: VLESS UUID

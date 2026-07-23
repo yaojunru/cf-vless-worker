@@ -77,6 +77,17 @@ npx wrangler secret put WS_PATH
 npm run deploy
 ```
 
+自定义域名需要写入 `wrangler.toml`，避免下一次部署丢失绑定：
+
+```toml
+workers_dev = false
+routes = [
+  { pattern = "proxy.example.com", custom_domain = true }
+]
+```
+
+首次绑定可执行 `npx wrangler deploy --domain proxy.example.com --keep-vars`，成功后再按上述配置执行一次 `npm run deploy`。
+
 ## Codex 部署 Skill
 
 仓库内包含可复用的部署 Skill：[`skills/cf-vless-worker-deploy`](./skills/cf-vless-worker-deploy/)。它已覆盖预检、Secret 配置、部署验证、回滚和受保护网站的诊断边界。

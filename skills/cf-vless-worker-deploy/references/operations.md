@@ -2,22 +2,22 @@
 
 ## Prerequisites
 
-Use Node.js 20 or newer, an authenticated Wrangler session, and a Cloudflare account with Workers enabled. Start in the repository root. This is a hard gate: do not set secrets or deploy until `whoami` succeeds.
+Use Node.js 20 or newer, an authenticated Wrangler session, and a Cloudflare account with Workers enabled. Start in the repository root. This is a hard gate: do not set secrets or deploy until `whoami --json` succeeds.
 
 ```bash
 npm install
 npm run check
 npm test
-node node_modules/wrangler/bin/wrangler.js whoami
+node node_modules/wrangler/bin/wrangler.js whoami --json
 ```
 
-If `whoami` reports that you are not authenticated, log in with:
+If `whoami --json` reports that you are not authenticated, log in with:
 
 ```bash
 node node_modules/wrangler/bin/wrangler.js login --use-keyring
 ```
 
-Complete the browser authorization, then repeat `whoami`. When the browser cannot be opened automatically, add `--browser=false` and open the printed link manually. Confirm that `whoami` displays the intended account before secrets or deploys. Use the dashboard or `npx wrangler deployments list` to inspect existing deployments.
+Complete the browser authorization, then repeat `whoami --json`. When the browser cannot be opened automatically, add `--browser=false` and open the printed link manually. Do not use plain `whoami` for automation because Wrangler 4.113.0 can stay open after printing the result. Confirm that the JSON has `loggedIn: true` and displays the intended account before secrets or deploys. Use the dashboard or `npx wrangler deployments list` to inspect existing deployments.
 
 ## Credential-free temporary smoke test
 
@@ -52,6 +52,32 @@ npm run deploy
 ```
 
 Do not use `wrangler secret bulk` with a committed JSON file. Do not place either value in `wrangler.toml`.
+
+## Custom domain
+
+First create the binding for an exact hostname in a Cloudflare zone you control:
+
+```bash
+node node_modules/wrangler/bin/wrangler.js deploy --domain proxy.example.com --keep-vars
+```
+
+After it succeeds, persist the same binding in `wrangler.toml` so an ordinary future deployment keeps it:
+
+```toml
+workers_dev = false
+routes = [
+  { pattern = "proxy.example.com", custom_domain = true }
+]
+```
+
+Deploy once more with `npm run deploy`, then query the hostname and require the Worker root behavior:
+
+```bash
+dig +short proxy.example.com
+curl -fsS -o /dev/null -w '%{http_code}\n' https://proxy.example.com/
+```
+
+The root response must be `404`. Do not bind an unowned hostname, an unproxied DNS record, or a wildcard route for this Worker.
 
 ## Smoke test
 

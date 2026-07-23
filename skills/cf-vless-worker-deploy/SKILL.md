@@ -16,10 +16,10 @@ Deploy this Worker as a VLESS-over-WebSocket TCP relay. Do not treat it as an HT
 5. Pass the authentication gate before any persistent deployment. Run:
 
    ```bash
-   node node_modules/wrangler/bin/wrangler.js whoami
+   node node_modules/wrangler/bin/wrangler.js whoami --json
    ```
 
-   If it reports that Wrangler is not authenticated, run `node node_modules/wrangler/bin/wrangler.js login --use-keyring`, complete the Cloudflare browser authorization, then run `whoami` again. Use `--browser=false` when the browser does not open. Stop here if `whoami` does not show the intended account; do not set secrets or deploy.
+   Use `--json` because the human-readable command can remain open after printing its result. If it reports that Wrangler is not authenticated, run `node node_modules/wrangler/bin/wrangler.js login --use-keyring`, complete the Cloudflare browser authorization, then run the JSON command again. Use `--browser=false` when the browser does not open. Stop here if its `loggedIn` field is not `true` or it does not show the intended account; do not set secrets or deploy.
 6. Generate a UUID locally and choose a unique path at least eight characters long. Never write either secret to tracked files, shell history, CI logs, or client screenshots.
 7. Set secrets interactively:
 
@@ -28,13 +28,13 @@ Deploy this Worker as a VLESS-over-WebSocket TCP relay. Do not treat it as an HT
    npx wrangler secret put WS_PATH
    ```
 
-8. Deploy with `npm run deploy`. Bind a custom domain only after the Worker URL works. Keep the DNS record proxied.
-9. Confirm that `/` is a `404` and that the exact configured path only upgrades with a WebSocket request. Use a VLESS client to test an actual TCP connection.
+8. Deploy with `npm run deploy`. Bind a custom domain only after the Worker URL works. Keep the DNS record proxied. Use the exact FQDN, then persist the binding in `wrangler.toml` with `workers_dev = false` and `routes = [{ pattern = "proxy.example.com", custom_domain = true }]`; do not rely on a one-off CLI flag for future deployments.
+9. Confirm that `/` is a `404` and that the exact configured path only upgrades with a WebSocket request. Confirm the custom hostname resolves to Cloudflare before testing with a VLESS client.
 10. Record the Worker version ID shown by Wrangler. Roll back with `npx wrangler rollback <version-id>` when the deployment regresses.
 
 ## Guardrails
 
-- Treat successful `whoami` output as a hard prerequisite for `wrangler secret put`, `npm run deploy`, custom-domain changes, rollback, and deployment inspection. A `--temporary` deployment is not a substitute for the user's Cloudflare account.
+- Treat successful `whoami --json` output as a hard prerequisite for `wrangler secret put`, `npm run deploy`, custom-domain changes, rollback, and deployment inspection. A `--temporary` deployment is not a substitute for the user's Cloudflare account.
 - Keep `UUID` and `WS_PATH` as Worker secrets, not `[vars]` in `wrangler.toml`.
 - Validate the local implementation with `npm run check` and `npm test` before every production deployment.
 - Treat a `403` from an upstream as the upstream's response, not proof that VLESS framing failed. Check a neutral HTTPS site first, then test the target from an ordinary browser through the configured VLESS client.

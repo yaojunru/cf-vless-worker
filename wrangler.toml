@@ -1,11 +1,6 @@
 name = "cf-vless-worker"
 main = "src/worker.js"
 compatibility_date = "2026-07-23"
-workers_dev = false
-
-routes = [
-  { pattern = "vless.airen2.pp.ua", custom_domain = true }
-]
 
 # Required runtime variables:
 # - UUID: VLESS UUID
@@ -14,3 +9,7 @@ routes = [
 # Set them as secrets:
 #   npx wrangler secret put UUID
 #   npx wrangler secret put WS_PATH
+#
+# Custom domains are intentionally not committed here because they identify
+# the account owner's private zone. Bind one explicitly at deploy time:
+#   npx wrangler deploy --domain proxy.example.com --keep-vars

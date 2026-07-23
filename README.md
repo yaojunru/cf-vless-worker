@@ -77,16 +77,11 @@ npx wrangler secret put WS_PATH
 npm run deploy
 ```
 
-自定义域名需要写入 `wrangler.toml`，避免下一次部署丢失绑定：
+自定义域名不要写入可提交的 `wrangler.toml`。域名属于账户持有人自己的 Cloudflare Zone，部署时需要由用户明确确认后再绑定：
 
-```toml
-workers_dev = false
-routes = [
-  { pattern = "proxy.example.com", custom_domain = true }
-]
+```bash
+npx wrangler deploy --domain proxy.example.com --keep-vars
 ```
-
-首次绑定可执行 `npx wrangler deploy --domain proxy.example.com --keep-vars`，成功后再按上述配置执行一次 `npm run deploy`。
 
 ## Codex 部署 Skill
 
@@ -116,10 +111,16 @@ node skills/cf-vless-worker-deploy/scripts/temporary-smoke-deploy.mjs .
 node skills/cf-vless-worker-deploy/scripts/local-smoke.mjs .
 ```
 
-生产部署可使用内置流程。它会先执行 `git pull --ff-only`，检查 Wrangler 登录；未登录时打开 Cloudflare 授权页并等待账户持有人确认。随后它会创建新的 Worker Secrets、部署、验证根路径为 `404`、通过 VLESS 对 `www.google.com` 完成 TLS 与 HTTP 验证，并生成私有客户端配置和二维码：
+生产部署可使用内置流程。它会先执行 `git pull --ff-only`，检查 Wrangler 登录；未登录时打开 Cloudflare 授权页并等待账户持有人确认。随后它会要求用户确认要绑定的自定义域名，创建新的 Worker Secrets、部署、验证根路径为 `404`、通过 VLESS 对 `www.google.com` 完成 TLS 与 HTTP 验证，并生成私有客户端配置和二维码：
 
 ```bash
 node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
+```
+
+如果在非交互环境运行，必须显式设置确认变量，值要和部署域名完全一致：
+
+```bash
+CF_VLESS_CONFIRM_DOMAIN=proxy.example.com node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
 ```
 
 生成的 `config.json`、VLESS 导入链接和 QR SVG 位于 `.vless-client/`。该目录被 Git 忽略；不要提交、分享或截图其中的内容。Wrangler 在部分桌面环境中可能会在输出上传进度后不退出，流程会有界等待并通过部署列表和实际连通性继续验证。

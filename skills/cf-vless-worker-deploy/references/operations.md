@@ -28,13 +28,19 @@ git pull --ff-only
 
 ## Production workflow
 
-Run the bundled workflow with a domain that is already present as a `custom_domain` route in `wrangler.toml`:
+Run the bundled workflow with an exact custom domain supplied by the account holder:
 
 ```bash
 node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
 ```
 
-It performs the following in order: verifies the checkout, checks Wrangler JSON authentication, opens a browser authorization page if authentication is missing, runs code tests, creates a new UUID and WebSocket path only in process memory, stores them as Worker Secrets, deploys, requires the hidden root to return `404`, establishes a VLESS tunnel to `www.google.com:443`, completes TLS, requires an HTTP response, and writes a private client bundle.
+It performs the following in order: verifies the checkout, checks Wrangler JSON authentication, opens a browser authorization page if authentication is missing, runs code tests, requires the user to confirm the exact custom domain before binding it, creates a new UUID and WebSocket path only in process memory, stores them as Worker Secrets, deploys with `--domain`, requires the hidden root to return `404`, establishes a VLESS tunnel to `www.google.com:443`, completes TLS, requires an HTTP response, and writes a private client bundle.
+
+For non-interactive automation, require an explicit confirmation variable whose value exactly matches the deployment hostname:
+
+```bash
+CF_VLESS_CONFIRM_DOMAIN=proxy.example.com node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
+```
 
 The bundle is written to `.vless-client/`, which must remain ignored by Git:
 
@@ -86,16 +92,7 @@ First create the binding for an exact hostname in a Cloudflare zone you control:
 node node_modules/wrangler/bin/wrangler.js deploy --domain proxy.example.com --keep-vars
 ```
 
-After it succeeds, persist the same binding in `wrangler.toml` so an ordinary future deployment keeps it:
-
-```toml
-workers_dev = false
-routes = [
-  { pattern = "proxy.example.com", custom_domain = true }
-]
-```
-
-Deploy once more with `npm run deploy`, then query the hostname and require the Worker root behavior:
+Do not commit that personal hostname to `wrangler.toml`. Future custom-domain deployments must pass `--domain proxy.example.com` again, or use the production script after confirming the domain. Then query the hostname and require the Worker root behavior:
 
 ```bash
 dig +short proxy.example.com

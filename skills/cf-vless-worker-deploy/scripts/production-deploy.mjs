@@ -3,11 +3,12 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve, join } from "node:path";
 import { request } from "node:https";
 import { resolve4 } from "node:dns/promises";
+import { createInterface } from "node:readline/promises";
 import tls from "node:tls";
 import process from "node:process";
 
@@ -25,17 +26,13 @@ if (!domain || !/^[a-z0-9.-]+$/i.test(domain) || domain.startsWith(".") || domai
 
 const wrangler = resolve(repoDir, "node_modules/wrangler/bin/wrangler.js");
 if (!existsSync(wrangler)) throw new Error("Wrangler is not installed. Run npm install first.");
-const configPath = join(repoDir, "wrangler.toml");
-const config = await readFile(configPath, "utf8");
-if (!config.includes(`pattern = \"${domain}\"`) || !config.includes("custom_domain = true")) {
-  throw new Error(`${domain} is not a custom-domain route in ${configPath}.`);
-}
 
 await requireCleanCheckout();
 await run("git", ["pull", "--ff-only"], repoDir);
 await ensureWranglerLogin();
 await run("npm", ["run", "check"], repoDir);
 await run("npm", ["test"], repoDir);
+await confirmDomainBinding(domain);
 
 const uuid = randomUUID();
 const wsPath = `/assets/${randomBytes(20).toString("hex")}`;
@@ -43,7 +40,7 @@ await putSecret("UUID", uuid);
 await putSecret("WS_PATH", wsPath);
 await writeClientBundle(uuid, wsPath);
 
-const deployment = await run(process.execPath, [wrangler, "deploy", "--keep-vars"], repoDir, { allowFailure: true, timeoutMs: 45_000 });
+const deployment = await run(process.execPath, [wrangler, "deploy", "--domain", domain, "--keep-vars"], repoDir, { allowFailure: true, timeoutMs: 45_000 });
 if (!deployment.output.includes("Total Upload") && deployment.code !== 0) {
   throw new Error(`Wrangler deployment did not begin successfully (exit ${deployment.code}).`);
 }
@@ -76,6 +73,22 @@ async function ensureWranglerLogin() {
   await runLogin();
   const verified = await run(process.execPath, [wrangler, "whoami", "--json"], repoDir, { print: false });
   if (JSON.parse(verified).loggedIn !== true) throw new Error("Cloudflare authorization did not complete.");
+}
+
+async function confirmDomainBinding(hostname) {
+  if (process.env.CF_VLESS_CONFIRM_DOMAIN === hostname) return;
+  if (!process.stdin.isTTY) {
+    throw new Error(`Refusing to bind ${hostname} without confirmation. Set CF_VLESS_CONFIRM_DOMAIN=${hostname} or run this script interactively and type the exact domain.`);
+  }
+
+  console.log(`This deployment will bind the custom domain: ${hostname}`);
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await rl.question(`Type ${hostname} to continue: `);
+    if (answer.trim() !== hostname) throw new Error("Domain confirmation did not match.");
+  } finally {
+    rl.close();
+  }
 }
 
 async function runLogin() {

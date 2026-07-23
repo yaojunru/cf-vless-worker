@@ -44,9 +44,19 @@ CF_VLESS_CONFIRM_DOMAIN=proxy.example.com node skills/cf-vless-worker-deploy/scr
 
 The bundle is written to `.vless-client/`, which must remain ignored by Git:
 
-- `config.json`: Xray-compatible client configuration.
+- `config.json`: Xray-compatible client configuration that proxies all traffic by default.
+- `config-priority-domains.json`: Xray-compatible client configuration that proxies only high-priority domains and sends unmatched traffic direct.
+- `priority-domains.txt`: the exact domain matchers used by `config-priority-domains.json`.
 - `vless-uri.txt`: import URI for compatible clients.
 - `vless-qr.svg`: offline QR code for the URI.
+
+The default priority matcher list targets common OpenAI/ChatGPT, X/Twitter, and Google hostnames. Override it with a comma- or whitespace-separated list when the user asks for a different set:
+
+```bash
+CF_VLESS_PRIORITY_DOMAINS="openai.com chatgpt.com x.com twitter.com google.com" node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
+```
+
+Values without a matcher prefix are written as `domain:<hostname>`. Values beginning with `domain:`, `full:`, `keyword:`, `regexp:`, or `geosite:` are preserved after validation. This only controls client routing priority; it does not make protected sites accept Worker egress.
 
 The script never prints generated credentials. Treat every file in this directory and screenshots of its QR code as a credential.
 

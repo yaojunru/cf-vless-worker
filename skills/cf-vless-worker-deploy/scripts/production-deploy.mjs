@@ -16,6 +16,20 @@ const require = createRequire(import.meta.url);
 const QRCode = require("../assets/qrcode-terminal/QRCode");
 const QRErrorCorrectLevel = require("../assets/qrcode-terminal/QRCode/QRErrorCorrectLevel");
 const { WebSocket, createWebSocketStream } = require("ws");
+const DEFAULT_PRIORITY_DOMAINS = [
+  "openai.com",
+  "chatgpt.com",
+  "oaistatic.com",
+  "oaiusercontent.com",
+  "x.com",
+  "twitter.com",
+  "twimg.com",
+  "t.co",
+  "google.com",
+  "gstatic.com",
+  "googleapis.com",
+  "googleusercontent.com",
+];
 
 const repoDir = resolve(process.argv[2] || ".");
 const domain = process.argv[3];
@@ -36,9 +50,10 @@ await confirmDomainBinding(domain);
 
 const uuid = randomUUID();
 const wsPath = `/assets/${randomBytes(20).toString("hex")}`;
+const priorityDomains = getPriorityDomains();
 await putSecret("UUID", uuid);
 await putSecret("WS_PATH", wsPath);
-await writeClientBundle(uuid, wsPath);
+await writeClientBundle(uuid, wsPath, priorityDomains);
 
 const deployment = await run(process.execPath, [wrangler, "deploy", "--domain", domain, "--keep-vars"], repoDir, { allowFailure: true, timeoutMs: 45_000 });
 if (!deployment.output.includes("Total Upload") && deployment.code !== 0) {
@@ -55,6 +70,7 @@ if (rootStatus !== 404) throw new Error(`Expected ${domain}/ to return 404, rece
 const googleStatus = await verifyVlessTls(domain, edgeAddress, wsPath, uuid, "www.google.com", "/generate_204");
 console.log(`Deployment verified: version ${version}; root 404; Google ${googleStatus}.`);
 console.log(`Private client bundle written to ${outputDir}`);
+console.log(`Priority-domain config includes ${priorityDomains.length} matchers.`);
 
 async function requireCleanCheckout() {
   const status = await run("git", ["status", "--porcelain"], repoDir, { print: false });
@@ -229,7 +245,32 @@ function withTimeout(promise, milliseconds, name) {
   return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`${name} timed out.`)), milliseconds))]);
 }
 
-async function writeClientBundle(uuid, path) {
+function getPriorityDomains() {
+  const raw = process.env.CF_VLESS_PRIORITY_DOMAINS;
+  const values = raw ? raw.split(/[\s,]+/) : DEFAULT_PRIORITY_DOMAINS;
+  const domains = [];
+  for (const value of values) {
+    const normalized = normalizeDomainMatcher(value);
+    if (normalized && !domains.includes(normalized)) domains.push(normalized);
+  }
+  if (domains.length === 0) throw new Error("At least one priority domain is required.");
+  return domains;
+}
+
+function normalizeDomainMatcher(value) {
+  const matcher = value.trim().toLowerCase();
+  if (!matcher) return null;
+  if (/^(domain|full|keyword|regexp|geosite):/.test(matcher)) {
+    if (/\s/.test(matcher)) throw new Error(`Invalid priority domain matcher: ${value}`);
+    return matcher;
+  }
+  if (!/^[a-z0-9.-]+$/.test(matcher) || matcher.startsWith(".") || matcher.endsWith(".")) {
+    throw new Error(`Invalid priority domain: ${value}`);
+  }
+  return `domain:${matcher}`;
+}
+
+async function writeClientBundle(uuid, path, priorityDomains) {
   const uri = new URL(`vless://${uuid}@${domain}:443`);
   uri.searchParams.set("encryption", "none");
   uri.searchParams.set("security", "tls");
@@ -238,18 +279,33 @@ async function writeClientBundle(uuid, path) {
   uri.searchParams.set("path", path);
   uri.searchParams.set("sni", domain);
   uri.hash = `${domain}-ws`;
+  const proxyOutbound = {
+    tag: "proxy",
+    protocol: "vless",
+    settings: { vnext: [{ address: domain, port: 443, users: [{ id: uuid, encryption: "none" }] }] },
+    streamSettings: { network: "ws", security: "tls", tlsSettings: { serverName: domain }, wsSettings: { path, headers: { Host: domain } } },
+  };
+  const directOutbound = { tag: "direct", protocol: "freedom" };
+  const inbounds = [
+    { tag: "socks-in", listen: "127.0.0.1", port: 10808, protocol: "socks", settings: { udp: true } },
+    { tag: "http-in", listen: "127.0.0.1", port: 10809, protocol: "http" },
+  ];
   const config = {
     log: { loglevel: "warning" },
-    inbounds: [
-      { tag: "socks-in", listen: "127.0.0.1", port: 10808, protocol: "socks", settings: { udp: true } },
-      { tag: "http-in", listen: "127.0.0.1", port: 10809, protocol: "http" },
-    ],
-    outbounds: [{
-      tag: "proxy",
-      protocol: "vless",
-      settings: { vnext: [{ address: domain, port: 443, users: [{ id: uuid, encryption: "none" }] }] },
-      streamSettings: { network: "ws", security: "tls", tlsSettings: { serverName: domain }, wsSettings: { path, headers: { Host: domain } } },
-    }, { tag: "direct", protocol: "freedom" }],
+    inbounds,
+    outbounds: [proxyOutbound, directOutbound],
+  };
+  const priorityConfig = {
+    log: { loglevel: "warning" },
+    inbounds,
+    outbounds: [directOutbound, proxyOutbound],
+    routing: {
+      domainStrategy: "IPIfNonMatch",
+      rules: [
+        { type: "field", domain: priorityDomains, outboundTag: "proxy" },
+        { type: "field", ip: ["geoip:private"], outboundTag: "direct" },
+      ],
+    },
   };
   const qr = new QRCode(-1, QRErrorCorrectLevel.M);
   qr.addData(uri.toString());
@@ -262,6 +318,8 @@ async function writeClientBundle(uuid, path) {
   await mkdir(outputDir, { recursive: true, mode: 0o700 });
   await Promise.all([
     writeFile(join(outputDir, "config.json"), `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 }),
+    writeFile(join(outputDir, "config-priority-domains.json"), `${JSON.stringify(priorityConfig, null, 2)}\n`, { mode: 0o600 }),
+    writeFile(join(outputDir, "priority-domains.txt"), `${priorityDomains.join("\n")}\n`, { mode: 0o600 }),
     writeFile(join(outputDir, "vless-uri.txt"), `${uri}\n`, { mode: 0o600 }),
     writeFile(join(outputDir, "vless-qr.svg"), svg, { mode: 0o600 }),
   ]);

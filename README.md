@@ -123,7 +123,21 @@ node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example
 CF_VLESS_CONFIRM_DOMAIN=proxy.example.com node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
 ```
 
-生成的 `config.json`、VLESS 导入链接和 QR SVG 位于 `.vless-client/`。该目录被 Git 忽略；不要提交、分享或截图其中的内容。Wrangler 在部分桌面环境中可能会在输出上传进度后不退出，流程会有界等待并通过部署列表和实际连通性继续验证。
+生成的配置、VLESS 导入链接和 QR SVG 位于 `.vless-client/`。该目录被 Git 忽略；不要提交、分享或截图其中的内容。Wrangler 在部分桌面环境中可能会在输出上传进度后不退出，流程会有界等待并通过部署列表和实际连通性继续验证。
+
+客户端配置会包含两个版本：
+
+- `config.json`：所有流量默认走 VLESS 代理。
+- `config-priority-domains.json`：只有高优域名走 VLESS 代理，其它流量默认直连。
+
+默认高优域名覆盖 OpenAI/ChatGPT、X/Twitter 和 Google 相关常用域名。需要自定义时，用逗号或空格传入域名；未带匹配前缀的值会按 `domain:<hostname>` 写入 Xray 规则：
+
+```bash
+CF_VLESS_PRIORITY_DOMAINS="openai.com chatgpt.com x.com twitter.com google.com" \
+  node skills/cf-vless-worker-deploy/scripts/production-deploy.mjs . proxy.example.com
+```
+
+高优域名配置只改变客户端路由，不绕过目标站点自己的挑战、地区、账号或出口信誉策略。
 
 ## 客户端配置
 

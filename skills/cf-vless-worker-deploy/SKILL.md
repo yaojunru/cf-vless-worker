@@ -20,7 +20,7 @@ Deploy this Worker as a VLESS-over-WebSocket TCP relay. Do not treat it as an HT
    ```
 
    Use `--json` because the human-readable command can remain open after printing its result. If it reports that Wrangler is not authenticated, run `node node_modules/wrangler/bin/wrangler.js login --use-keyring`. Open the authorization URL when Wrangler cannot launch a browser and wait for the account holder to complete consent. Do not bypass login, consent, MFA, or anti-bot controls. Stop here if its `loggedIn` field is not `true` or it does not show the intended account; do not set secrets or deploy.
-6. For the repeatable production workflow, run `node scripts/production-deploy.mjs <repo-dir> <custom-domain>`. It pulls, opens the authorization page when required, requires the user to confirm the exact custom domain before binding it, creates secrets in memory, deploys with `--domain`, requires a hidden-root `404`, verifies a VLESS TLS request to Google, and writes ignored client configuration plus a QR SVG.
+6. For the repeatable production workflow, run `node scripts/production-deploy.mjs <repo-dir> <custom-domain>`. It pulls, opens the authorization page when required, requires the user to confirm the exact custom domain before binding it, creates secrets in memory, deploys with `--domain`, requires a hidden-root `404`, verifies a VLESS TLS request to Google, and writes ignored client configuration plus a QR SVG. It writes both a global-proxy client config and a priority-domain config.
 7. Otherwise, generate a UUID locally and choose a unique path at least eight characters long. Never write either secret to tracked files, shell history, CI logs, or client screenshots. Set secrets interactively:
 
    ```bash
@@ -37,6 +37,7 @@ Deploy this Worker as a VLESS-over-WebSocket TCP relay. Do not treat it as an HT
 - Treat successful `whoami --json` output as a hard prerequisite for `wrangler secret put`, `npm run deploy`, custom-domain changes, rollback, and deployment inspection. A `--temporary` deployment is not a substitute for the user's Cloudflare account.
 - Treat custom domains as account-owner private configuration. Require the user to provide and confirm the exact FQDN during deployment; do not add `routes = [...]` or `workers_dev = false` to tracked config just to bind a personal hostname.
 - Keep `UUID` and `WS_PATH` as Worker secrets, not `[vars]` in `wrangler.toml`.
+- Generate `config-priority-domains.json` for clients that should proxy only high-priority domains. Use `CF_VLESS_PRIORITY_DOMAINS` to override the default OpenAI/ChatGPT, X/Twitter, and Google-oriented matcher list. Treat this as client routing only; it does not bypass upstream challenges or access controls.
 - Validate the local implementation with `npm run check` and `npm test` before every production deployment.
 - Treat a `403` from an upstream as the upstream's response, not proof that VLESS framing failed. Check a neutral HTTPS site first, then test the target from an ordinary browser through the configured VLESS client.
 - Do not use Worker `fetch()` to make a generic browsing reverse proxy. It changes origin, cookies, redirects, CSP, WebSockets, and anti-abuse signals; it is not equivalent to a client TCP tunnel.
